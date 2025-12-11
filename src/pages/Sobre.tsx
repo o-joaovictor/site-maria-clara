@@ -18,7 +18,7 @@ export default function Sobre() {
             <div className="relative">
               <div className="aspect-[3/4] rounded-2xl bg-gradient-to-br from-amber-100 to-stone-200 shadow-2xl overflow-hidden">
                 <img
-                  src="public/maria-clara/sobre.jpg"
+                  src="/maria-clara/sobre.jpg"
                   alt="Maria Clara Rolim no consultório"
                   className="w-full h-full object-cover"
                 />
