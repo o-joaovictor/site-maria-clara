@@ -1,207 +1,175 @@
-import { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, Clock, CheckCircle } from 'lucide-react';
-import Input from '../components/Input';
-import Button from '../components/Button';
-import { supabase } from '../lib/supabaseClient';
+import { useEffect, useState } from 'react'
+import { Calendar, Clock } from 'lucide-react'
+import Input from '../components/Input'
+import Button from '../components/Button'
+import { supabase } from '../lib/supabaseClient'
 
-const AVAILABLE_TIMES = ['08:00', '09:00', '10:00', '11:00', '14:00', '15:00', '16:00'];
+const AVAILABLE_TIMES = ['08:00', '09:00', '10:00', '11:00', '14:00', '15:00', '16:00']
 
 export default function Agendamentos() {
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [selectedDate, setSelectedDate] = useState('');
-  const [selectedTime, setSelectedTime] = useState('');
-  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [date, setDate] = useState('')
+  const [time, setTime] = useState('')
+  const [availableTimes, setAvailableTimes] = useState<string[]>([])
+  const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
+  const [error, setError] = useState('')
 
-  const minDate = new Date();
-  minDate.setDate(minDate.getDate() + 1);
-  const minDateString = minDate.toISOString().split('T')[0];
+  const minDate = new Date()
+  minDate.setDate(minDate.getDate() + 1)
+  const minDateString = minDate.toISOString().split('T')[0]
 
+  // 🔹 Carrega horários quando a data muda
   useEffect(() => {
-    if (selectedDate) {
-      loadAvailableTimes(selectedDate);
-    }
-  }, [selectedDate]);
+    if (!date) return
 
-  const loadAvailableTimes = async (date: string) => {
-    try {
+    const loadTimes = async () => {
       const { data, error } = await supabase
         .from('appointments')
         .select('time')
-        .eq('date', date);
+        .eq('date', date)
 
-      if (error) throw error;
-
-      const bookedTimes = data?.map((appointment) => appointment.time) || [];
-      const available = AVAILABLE_TIMES.filter((time) => !bookedTimes.includes(time));
-      setAvailableTimes(available);
-      setSelectedTime('');
-    } catch (err) {
-      console.error('Error loading times:', err);
-      setAvailableTimes(AVAILABLE_TIMES);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccess(false);
-
-    if (!firstName.trim() || !lastName.trim() || !selectedDate || !selectedTime) {
-      setError('Por favor, preencha todos os campos');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const { data: existingAppointment } = await supabase
-        .from('appointments')
-        .select('id')
-        .eq('date', selectedDate)
-        .eq('time', selectedTime)
-        .maybeSingle();
-
-      if (existingAppointment) {
-        setError('Este horário já está ocupado. Por favor, escolha outro.');
-        setLoading(false);
-        await loadAvailableTimes(selectedDate);
-        return;
+      if (error) {
+        setAvailableTimes(AVAILABLE_TIMES)
+        return
       }
 
-      const { error: insertError } = await supabase
-        .from('appointments')
-        .insert([
-          {
-            first_name: firstName.trim(),
-            last_name: lastName.trim(),
-            date: selectedDate,
-            time: selectedTime,
-          },
-        ]);
+      const bookedTimes = data.map((item) => item.time)
+      const freeTimes = AVAILABLE_TIMES.filter(
+        (t) => !bookedTimes.includes(t)
+      )
 
-      if (insertError) throw insertError;
-
-      setSuccess(true);
-      setFirstName('');
-      setLastName('');
-      setSelectedDate('');
-      setSelectedTime('');
-      setAvailableTimes([]);
-
-      setTimeout(() => setSuccess(false), 5000);
-    } catch (err) {
-      console.error('Error creating appointment:', err);
-      setError('Erro ao agendar consulta. Tente novamente.');
-    } finally {
-      setLoading(false);
+      setAvailableTimes(freeTimes)
+      setTime('')
     }
-  };
+
+    loadTimes()
+  }, [date])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setSuccess(false)
+
+    if (!firstName || !lastName || !date || !time) {
+      setError('Preencha todos os campos')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const { error } = await supabase.from('appointments').insert([
+        {
+          first_name: firstName,
+          last_name: lastName,
+          date,
+          time,
+        },
+      ])
+
+      if (error) throw error
+
+      setSuccess(true)
+      setFirstName('')
+      setLastName('')
+      setDate('')
+      setTime('')
+      setAvailableTimes([])
+    } catch (err) {
+      setError('Erro ao realizar o agendamento')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const isFormValid =
+    firstName && lastName && date && time && !loading
 
   return (
     <div className="min-h-screen bg-[#F7F3EE]">
-      <section className="bg-gradient-to-br from-white to-stone-50 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="font-serif text-5xl text-amber-900 text-center mb-4">Agendar Consulta</h1>
-          <p className="text-xl text-gray-600 text-center max-w-2xl mx-auto">
-            Preencha o formulário abaixo para agendar sua consulta
-          </p>
-        </div>
+      {/* Header */}
+      <section className="py-16 text-center">
+        <h1 className="font-serif text-5xl text-amber-900 mb-2">
+          Agendar Consulta
+        </h1>
+        <p className="text-gray-600">
+          Preencha o formulário abaixo para agendar sua consulta
+        </p>
       </section>
 
-      <section className="py-16">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-          {success && (
-            <div className="bg-green-50 border-2 border-green-500 rounded-xl p-6 mb-8 flex items-start">
-              <CheckCircle className="text-green-600 flex-shrink-0 mt-1" size={24} />
-              <div className="ml-4">
-                <h3 className="font-medium text-green-900 mb-1">Agendamento Confirmado!</h3>
-                <p className="text-green-700">
-                  Sua consulta foi agendada com sucesso. Em breve entraremos em contato para confirmar.
-                </p>
+      {/* Form */}
+      <section className="pb-16">
+        <div className="max-w-xl mx-auto px-4">
+          <div className="bg-white rounded-2xl shadow-lg p-8 space-y-6">
+            {success && (
+              <div className="bg-green-50 border border-green-500 text-green-800 p-4 rounded-lg text-center">
+                Agendamento realizado com sucesso!
               </div>
-            </div>
-          )}
+            )}
 
-          <div className="bg-white rounded-2xl shadow-lg p-8 md:p-12">
+            {error && (
+              <div className="bg-red-50 border border-red-500 text-red-800 p-4 rounded-lg text-center">
+                {error}
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-4">
                 <Input
                   label="Nome"
-                  type="text"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="Seu nome"
-                  required
                 />
                 <Input
                   label="Sobrenome"
-                  type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Seu sobrenome"
-                  required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <CalendarIcon className="inline mr-2" size={18} />
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  <Calendar className="inline mr-2" size={16} />
                   Data da Consulta
                 </label>
                 <Input
                   type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
+                  value={date}
                   min={minDateString}
-                  required
+                  onChange={(e) => setDate(e.target.value)}
                 />
-                <p className="mt-2 text-sm text-gray-500">
+                <p className="text-sm text-gray-500 mt-1">
                   Selecione uma data a partir de amanhã
                 </p>
               </div>
 
-              {selectedDate && (
+              {date && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    <Clock className="inline mr-2" size={18} />
+                  <label className="text-sm font-medium text-gray-700 mb-3 block">
+                    <Clock className="inline mr-2" size={16} />
                     Horário Disponível
                   </label>
-                  {availableTimes.length > 0 ? (
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                      {availableTimes.map((time) => (
-                        <button
-                          key={time}
-                          type="button"
-                          onClick={() => setSelectedTime(time)}
-                          className={`py-3 px-4 rounded-lg border-2 transition-all font-medium ${
-                            selectedTime === time
-                              ? 'border-amber-800 bg-amber-800 text-white'
-                              : 'border-stone-300 bg-white text-gray-700 hover:border-amber-600'
-                          }`}
-                        >
-                          {time}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="bg-amber-50 border-2 border-amber-200 rounded-lg p-4 text-center">
-                      <p className="text-amber-900">
-                        Não há horários disponíveis para esta data.
-                        <br />
-                        Por favor, escolha outra data.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
 
-              {error && (
-                <div className="bg-red-50 border-2 border-red-500 rounded-lg p-4">
-                  <p className="text-red-900 text-center">{error}</p>
+                  <div className="grid grid-cols-4 gap-3">
+                    {availableTimes.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setTime(t)}
+                        className={`py-2 rounded-lg border font-medium transition ${
+                          time === t
+                            ? 'bg-amber-800 text-white border-amber-800'
+                            : 'bg-white border-gray-300 text-gray-700 hover:border-amber-600'
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -209,36 +177,26 @@ export default function Agendamentos() {
                 type="submit"
                 size="lg"
                 className="w-full"
-                disabled={loading || !firstName || !lastName || !selectedDate || !selectedTime}
+                disabled={!isFormValid}
               >
                 {loading ? 'Agendando...' : 'Confirmar Agendamento'}
               </Button>
             </form>
           </div>
 
-          <div className="mt-8 bg-amber-50 rounded-xl p-6 border-2 border-amber-200">
-            <h3 className="font-medium text-amber-900 mb-3">Informações Importantes</h3>
-            <ul className="space-y-2 text-sm text-gray-700">
-              <li className="flex items-start">
-                <span className="text-amber-800 mr-2">•</span>
-                <span>Os agendamentos estão sujeitos à confirmação</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-amber-800 mr-2">•</span>
-                <span>Entraremos em contato via WhatsApp para confirmar sua consulta</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-amber-800 mr-2">•</span>
-                <span>Caso não possa comparecer, avise com antecedência</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-amber-800 mr-2">•</span>
-                <span>Atendimentos realizados na Clínica Escola Uninassau - Boa Viagem</span>
-              </li>
+          <div className="mt-8 bg-amber-50 border border-amber-200 rounded-xl p-6">
+            <h3 className="font-medium text-amber-900 mb-3">
+              Informações Importantes
+            </h3>
+            <ul className="text-sm text-gray-700 space-y-2">
+              <li>• Os agendamentos estão sujeitos à confirmação</li>
+              <li>• Entraremos em contato via WhatsApp</li>
+              <li>• Caso não possa comparecer, avise com antecedência</li>
+              <li>• Clínica Escola Uninassau – Boa Viagem</li>
             </ul>
           </div>
         </div>
       </section>
     </div>
-  );
+  )
 }
